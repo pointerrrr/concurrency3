@@ -88,7 +88,7 @@ namespace Template
 			// entry point
 			using (OpenTKApp app = new OpenTKApp()) 
 			{ 
-				app.Run( 30.0, 0.0 ); 
+				app.Run( 30.0, 30.0 ); 
 			}
 		}
 	}

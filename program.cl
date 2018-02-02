@@ -12,21 +12,36 @@ __kernel void device_function( __global int* newScreen, __global int* oldScreen 
 	//int[] oldScreen = get_global_id(2);
 	//int[] newScreen = get_global_id(3);
 	int id = idx + 512 * idy;
-	if (id >= (512 * 512)) return;
+	if (idx > 510 || idx < 2 || idy > 510 || idy < 2) return;
 	float2 fragCoord = (float2)( (float)idx, (float)idy ), resolution = (float2)( 512, 512 );
-	float3 col = (float3)( 0.f, 0.f, 0.f );
-	for( int m = 0; m < 4; m++ ) for( int n = 0; n < 4; n++ )
-	{
-		col = (float3)(8.f,0.f,0.f);
-	}
+	//float3 col = (float3)( 0.f, 0.f, 0.f );
+	int col = 0;
+	//col = (float3)(8.f,0.f,0.f);
+	col += oldScreen[id+1]/255;
+	col += oldScreen[id-1]/255;
+	col += oldScreen[id+512]/255;
+	col += oldScreen[id-512]/255;
+	col += oldScreen[id+1+512]/255;
+	col += oldScreen[id-1+512]/255;
+	col += oldScreen[id+1-512]/255;
+	col += oldScreen[id-1-512]/255;
+	//col += oldScreen[id]/255;
+	if((col == 2 || col == 3) && oldScreen[id]/255 == 1)
+		col = 255;
+	else if (col == 3 && oldScreen[id]/255 == 0)
+		col = 255;
+	else
+		col = 0;
+	//col = oldScreen[id];
+	
 #ifdef GLINTEROP
 	int2 pos = (int2)(idx,idy);
-	write_imagef( a, pos, (float4)(col * (1.0f / 16.0f), 1.0f ) );
+	//write_imagef( a, pos, (float4)(col * (1.0f / 16.0f), 1.0f ) );
 #else
-	int r = (int)clamp( 16.0f * col.x, 0.f, 255.f );
+	/*int r = (int)clamp( 16.0f * col.x, 0.f, 255.f );
 	int g = (int)clamp( 16.0f * col.y, 0.f, 255.f );
-	int b = (int)clamp( 16.0f * col.z, 0.f, 255.f );
+	int b = (int)clamp( 16.0f * col.z, 0.f, 255.f );*/
 	//a[id] = (r << 16) + (g << 8) + b;
-	newScreen[id] = oldScreen[id];
+	newScreen[id] = col;
 #endif
 }
