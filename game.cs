@@ -18,31 +18,34 @@ namespace Template {
 	    static OpenCLProgram ocl = new OpenCLProgram( "../../program.cl" );
 	    // find the kernel named 'device_function' in the program
 	    OpenCLKernel kernel = new OpenCLKernel( ocl, "device_function" );
-	    // create a regular buffer; by default this resides on both the host and the device
-	    OpenCLBuffer<int> buffer = new OpenCLBuffer<int>( ocl, 512 * 512 );
-        OpenCLBuffer<int> oldScreen = new OpenCLBuffer<int>(ocl, 512 * 512);
+        // create a regular buffer; by default this resides on both the host and the device
+        OpenCLBuffer<int> buffer;
+        OpenCLBuffer<int> oldScreen;
         // create an OpenGL texture to which OpenCL can send data
         OpenCLImage<int> image = new OpenCLImage<int>( ocl, 512, 512 );
 	    public Surface screen;
 
-        uint pw, ph; // note: pw is in uints; width in bits is 32 this value.
+        int pw, ph; // note: pw is in uints; width in bits is 32 this value.
 
         Stopwatch timer = new Stopwatch();
-	    float t = 21.5f;
+	    //float t = 21.5f;
 	    public void Init()
 	    {
-            int[] testzors = jemoeder();
+            int[] testzors = parser();
+            buffer = new OpenCLBuffer<int>(ocl, ph * pw);
+            oldScreen = new OpenCLBuffer<int>(ocl, ph * pw);
             for (int i = 0; i < oldScreen.Length; i++)
             {
-                int x = i % 512;
-                int y = i / 512;
-                oldScreen[i] = testzors[x + y * ph];
+                /*int x = i % pw;
+                int y = i / ph;*/
+                oldScreen[i] = testzors[i];
             }
             oldScreen.CopyToDevice();
             if (GLInterop) kernel.SetArgument(0, image);
             else kernel.SetArgument(0, buffer);
             kernel.SetArgument(1, oldScreen);
-            
+            kernel.SetArgument(2, pw);
+            kernel.SetArgument(3, ph);
         }
         int counter = 0;
         public void Tick()
@@ -51,9 +54,13 @@ namespace Template {
 		    // clear the screen
 		    screen.Clear( 0 );
             // do opencl stuff
-            kernel.SetArgument(2, counter++);
+            kernel.SetArgument(4, counter++);
             // execute kernel
-            long [] workSize = { 512, 512 };
+            int npw = pw + (pw % 64);
+            int nph = ph + (ph % 64);
+            int finallolol = (int)Math.Max(npw, nph);
+            int extrafinal = (int)Math.Log(finallolol, 2);
+            long [] workSize = { (int)Math.Pow(2, extrafinal +1 ), (int)Math.Pow(2, extrafinal + 1) };
 		    long [] localSize = { 32, 4 };
 		    if (GLInterop)
 		    {
@@ -82,16 +89,13 @@ namespace Template {
 			    // plot pixels using the data on the host
 			    for( int y = 0; y < 512; y++ ) for( int x = 0; x < 512; x++ )
 			    {
-				    screen.pixels[x + y * screen.width] = buffer[x + y * 512];
+				    screen.pixels[(x) + (y) * screen.width] = buffer[(x+xoffset) + (y+yoffset) * pw];
 			    }
 		    }
-            /*OpenCLBuffer<int> temp = buffer;
-            buffer = oldScreen;
-            oldScreen = temp;
-            oldScreen.CopyToDevice();*/
         }
 
-        int[] jemoeder()
+        // code taken from parser from c# gol template
+        int[] parser()
         {
             int[] result = null;
             StreamReader sr = new StreamReader("../../assets/turing_js_r.rle");
@@ -105,8 +109,8 @@ namespace Template {
                 else if (line[pos] == 'x') // header
                 {
                     String[] sub = line.Split(new char[] { '=', ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    pw = UInt32.Parse(sub[1]);
-                    ph = UInt32.Parse(sub[3]);
+                    pw = Int32.Parse(sub[1]);
+                    ph = Int32.Parse(sub[3]);
                     result = new int[pw * ph];
                 }
                 else while (pos < line.Length)
@@ -116,12 +120,11 @@ namespace Template {
                         if (state == 1) // expect other character
                         {
                             if (c == '$') { y += n; x = 0; } // newline
-                            else if (c == 'o') for (int i = 0; i < n; i++) result[x++ + y * ph]= 255; else if (c == 'b') x += n;
+                            else if (c == 'o') for (int i = 0; i < n; i++) result[x++ + y * pw] = 255; else if (c == 'b') x += n;
                             state = n = 0;
                         }
                     }
             }
-            // swap buffers
             return result;
         }
         public void Render() 
@@ -139,6 +142,40 @@ namespace Template {
 			    GL.End();
 		    }
 	    }
-    }
 
+
+        bool lastLButtonState;
+        int xoffset, yoffset, dragXStart, dragYStart, offsetXStart, offsetYStart;
+
+        // code taken from mouse from c# gol template
+        public void SetMouseState(int x, int y, bool pressed)
+        {
+            if (pressed)
+            {
+                if (lastLButtonState)
+                {
+                    int deltax = x - dragXStart, deltay = y - dragYStart;
+                    xoffset = (int)Math.Min(pw * 32 - screen.width, Math.Max(0, offsetXStart - deltax));
+                    yoffset = (int)Math.Min(ph - screen.height, Math.Max(0, offsetYStart - deltay));
+                    if (xoffset > pw - screen.width - 1)
+                        xoffset = pw - screen.width - 1;
+                    if (yoffset > ph - screen.height - 1)
+                        yoffset = ph - screen.height - 1;
+                    if (xoffset < 0)
+                        xoffset = 0;
+                    if (yoffset < 0)
+                        yoffset = 0;
+                }
+                else
+                {
+                    dragXStart = x;
+                    dragYStart = y;
+                    offsetXStart = (int)xoffset;
+                    offsetYStart = (int)yoffset;
+                    lastLButtonState = true;
+                }
+            }
+            else lastLButtonState = false;
+        }
+    }
 } // namespace Template
