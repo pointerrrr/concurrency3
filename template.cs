@@ -17,6 +17,7 @@ namespace Template
     // game.Render(), which may perform additional OpenGL rendering on top of the initial
     // output.
 
+    // code taken from from c# gol template
     internal static class CursorPosition
     {
         [StructLayout(LayoutKind.Sequential)]
